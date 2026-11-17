@@ -1,7 +1,7 @@
 /* Arbeitsberichte – Handy-App (läuft komplett im Browser, Daten bleiben auf dem Gerät) */
 (function () {
   'use strict';
-  const VERSION = '1.3';
+  const VERSION = '1.4';
   const $ = (id) => document.getElementById(id);
   const K = { berichte: 'abh.berichte', einst: 'abh.einst', projekte: 'abh.projekte' };
 
@@ -394,9 +394,52 @@
     const liste = alle.filter(b => !q || [b.nr, b.kunde, b.projekt, b.taet, 'kw' + b.kw].join(' ').toLowerCase().includes(q));
     $('alleLeer').hidden = alle.length > 0;
     const summe = liste.reduce((s, b) => s + (b.gez ?? b.std ?? 0), 0);
-    $('alleSumme').textContent = alle.length
-      ? `${liste.filter(b => b.quelle !== 'ersetzt').length} Berichte · ${ABH.zahl(summe)} Std.` + (projekte.stand ? ` · Stand ${new Date(projekte.stand).toLocaleDateString('de-AT')}` : '')
-      : '';
+    $('alleSumme').textContent = alle.length && projekte.stand ? `Stand ${new Date(projekte.stand).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' })}` : '';
+    const zaehlt = liste.filter(b => b.quelle !== 'ersetzt');
+    const kunden = new Set(zaehlt.map(b => (b.kunde || '').trim().toLowerCase()).filter(Boolean));
+    const nrn = new Set(zaehlt.map(b => b.nr).filter(Boolean));
+    $('alleSummen').hidden = !alle.length;
+    $('alleSummen').innerHTML = `
+      <div><b>${ABH.zahl(summe)}</b><span>Stunden</span></div>
+      <div><b>${zaehlt.length}</b><span>Berichte</span></div>
+      <div><b>${kunden.size}</b><span>Kunden</span></div>
+      <div><b>${nrn.size}</b><span>Projekte</span></div>`;
+    $('ansichtWoche').classList.toggle('aktiv', ansicht === 'woche');
+    $('ansichtKunde').classList.toggle('aktiv', ansicht === 'kunde');
+    const h = (b) => b.gez ?? b.std ?? 0;
+    const pfeil = (offen) => `<i class="pfeil">${offen ? '▾' : '▸'}</i>`;
+    const suche = q.length > 0;   // beim Suchen alles aufklappen
+
+    if (ansicht === 'kunde') {
+      const gruppen = new Map();
+      for (const b of liste) {
+        const k = (b.kunde || '').trim() || 'ohne Kunde';
+        if (!gruppen.has(k)) gruppen.set(k, []);
+        gruppen.get(k).push(b);
+      }
+      const reihen = [...gruppen.entries()].map(([k, g]) => ({ k, g, std: g.reduce((s, b) => s + h(b), 0) })).sort((a, b) => b.std - a.std);
+      $('alleListe').innerHTML = reihen.map(({ k, g, std }) => {
+        const offen = suche || offeneGruppen.has('k:' + k);
+        const proj = new Map();
+        for (const b of g) { if (!proj.has(b.nr)) proj.set(b.nr, []); proj.get(b.nr).push(b); }
+        const zeilen = [...proj.entries()].map(([nr, pg]) => {
+          const daten = pg.flatMap(b => [b.von, b.bis]).filter(Boolean).sort();
+          return `<button class="projekt-zeile" data-nr="${esc(nr)}">
+            <div class="z1"><span class="nr">${esc(nr || '–')}</span><span class="std">${ABH.zahl(pg.reduce((s, b) => s + h(b), 0))} Std.</span></div>
+            <div class="z2">${esc(pg[0].projekt || '')}</div>
+            <div class="z2">${pg.filter(b => b.quelle !== 'ersetzt').length} Berichte · ${daten.length ? ABH.datumDE(daten[0]) + ' – ' + ABH.datumDE(daten[daten.length - 1]) : ''}</div></button>`;
+        }).join('');
+        return `<div class="gruppe"><button class="kw-titel" data-g="k:${esc(k)}">${pfeil(offen)}${esc(k)}<span>${proj.size} Proj. · ${ABH.zahl(std)} Std.</span></button>
+          <div class="gruppe-inhalt"${offen ? '' : ' hidden'}>${zeilen}</div></div>`;
+      }).join('');
+      $('alleListe').querySelectorAll('.projekt-zeile').forEach(z => z.onclick = () => {
+        // Projekt antippen: alle Berichte dieses Projekts nach Woche zeigen
+        $('alleSuche').value = z.dataset.nr; ansicht = 'woche'; sichern('abh.ansicht', ansicht); alleZeigen(); window.scrollTo(0, 0);
+      });
+      gruppenKlick();
+      return;
+    }
+
     // nach Woche gruppieren
     const gruppen = new Map();
     for (const b of liste) {
@@ -405,10 +448,13 @@
       gruppen.get(k).push(b);
     }
     const schluessel = [...gruppen.keys()].sort().reverse();
+    if (!laden('abh.offen', null) && schluessel.length) offeneGruppen.add('w:' + schluessel[0]); // beim ersten Mal: neueste Woche offen
     $('alleListe').innerHTML = schluessel.map(k => {
       const g = gruppen.get(k), [jahr, kw] = k.split('-');
-      const std = g.reduce((s, b) => s + (b.gez ?? b.std ?? 0), 0);
-      return `<div class="kw-titel">KW ${+kw} / ${jahr}<span>${ABH.zahl(std)} Std.</span></div>` + g.map(b => {
+      const std = g.reduce((s, b) => s + h(b), 0);
+      const offen = suche || offeneGruppen.has('w:' + k);
+      return `<div class="gruppe"><button class="kw-titel" data-g="w:${k}">${pfeil(offen)}KW ${+kw} / ${jahr}<span>${g.filter(b => b.quelle !== 'ersetzt').length} Ber. · ${ABH.zahl(std)} Std.</span></button>
+        <div class="gruppe-inhalt"${offen ? '' : ' hidden'}>` + g.map(b => {
         const datum = b.von ? ABH.datumDE(b.von) + (b.bis && b.bis !== b.von ? ' – ' + ABH.datumDE(b.bis) : '') : '';
         const std = b.quelle === 'teils' ? `${ABH.zahl(b.gez)} <span class="klein-grau">(${ABH.zahl(b.std)})</span>`
           : b.quelle === 'ersetzt' ? `<span class="klein-grau">(${ABH.zahl(b.std)})</span>` : ABH.zahl(b.std || 0);
@@ -417,10 +463,27 @@
           <div class="z2">${esc([b.kunde, b.projekt].filter(Boolean).join(' – ') || '–')}</div>
           <div class="z2">${esc(datum)}</div>
           <div class="taet">${esc(b.taet || 'Keine Tätigkeiten eingetragen.')}${b.quelle === 'ersetzt' ? '\n\nDiese Tage sind durch einen Handy-Bericht abgedeckt und zählen nicht mit.' : b.quelle === 'teils' ? '\n\nEinzelne Tage sind durch einen Handy-Bericht abgedeckt und zählen dort.' : ''}</div></button>`;
-      }).join('');
+      }).join('') + '</div></div>';
     }).join('');
     $('alleListe').querySelectorAll('.eintrag').forEach(e => e.onclick = () => e.classList.toggle('offen'));
+    gruppenKlick();
   }
+
+  // Auf-/Zuklappen der Gruppen (wird gemerkt)
+  let ansicht = laden('abh.ansicht', 'woche');
+  const offeneGruppen = new Set(laden('abh.offen', []) || []);
+  function gruppenKlick() {
+    $('alleListe').querySelectorAll('.kw-titel').forEach(t => t.onclick = () => {
+      const g = t.dataset.g, inhalt = t.nextElementSibling;
+      const offen = inhalt.hidden;
+      inhalt.hidden = !offen;
+      t.querySelector('.pfeil').textContent = offen ? '▾' : '▸';
+      if (offen) offeneGruppen.add(g); else offeneGruppen.delete(g);
+      sichern('abh.offen', [...offeneGruppen]);
+    });
+  }
+  $('ansichtWoche').onclick = () => { ansicht = 'woche'; sichern('abh.ansicht', ansicht); alleZeigen(); };
+  $('ansichtKunde').onclick = () => { ansicht = 'kunde'; sichern('abh.ansicht', ansicht); alleZeigen(); };
 
   // ---------- Einstellungen ----------
   $('einstKnopf').onclick = () => {

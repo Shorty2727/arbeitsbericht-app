@@ -114,3 +114,18 @@ textarea { resize: vertical; min-height: 110px; }
 .pille.pcq { background: #ece9e3; color: #555; }
 .pille.ersetzt { background: #f1efea; color: #999; text-decoration: line-through; }
 .eintrag.grau { opacity: .6; }
+
+/* Gruppen zum Auf-/Zuklappen, Summen, Kundenansicht */
+.reiter.klein button { padding: 6px 8px; font-size: 14px; }
+.summen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 12px 8px; text-align: center; }
+.summen b { display: block; font-size: 18px; color: var(--wein); }
+.summen span { font-size: 12px; color: var(--grau); }
+button.kw-titel { width: 100%; border: 0; background: #fff; border-radius: 12px; padding: 12px 12px; font: inherit; font-size: 15px;
+  font-weight: 700; color: var(--wein); align-items: center; gap: 8px; margin-top: 10px; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+button.kw-titel span { margin-left: auto; font-size: 13px; white-space: nowrap; }
+.pfeil { font-style: normal; color: var(--grau); width: 14px; display: inline-block; }
+.gruppe-inhalt { padding-left: 8px; }
+.projekt-zeile { display: block; width: 100%; text-align: left; background: var(--flaeche); border: 0; border-radius: 14px;
+  padding: 10px 14px; font: inherit; color: var(--text); margin-top: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.projekt-zeile .z1 { display: flex; } .projekt-zeile .nr { font-weight: 700; color: var(--wein); } .projekt-zeile .std { margin-left: auto; font-weight: 600; }
+.projekt-zeile .z2 { font-size: 14px; color: var(--grau); }
