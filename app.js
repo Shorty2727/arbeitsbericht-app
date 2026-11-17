@@ -1,7 +1,7 @@
 /* Arbeitsberichte – Handy-App (läuft komplett im Browser, Daten bleiben auf dem Gerät) */
 (function () {
   'use strict';
-  const VERSION = '1.4';
+  const VERSION = '1.5';
   const $ = (id) => document.getElementById(id);
   const K = { berichte: 'abh.berichte', einst: 'abh.einst', projekte: 'abh.projekte' };
 
@@ -449,11 +449,18 @@
     }
     const schluessel = [...gruppen.keys()].sort().reverse();
     if (!laden('abh.offen', null) && schluessel.length) offeneGruppen.add('w:' + schluessel[0]); // beim ersten Mal: neueste Woche offen
-    $('alleListe').innerHTML = schluessel.map(k => {
-      const g = gruppen.get(k), [jahr, kw] = k.split('-');
+    const jahre = [...new Set(schluessel.map(k => k.split('-')[0]))];
+    if (jahreZu === null) { jahreZu = new Set(jahre.slice(1)); sichern('abh.jahreZu', [...jahreZu]); } // nur das neueste Jahr offen
+    $('alleListe').innerHTML = jahre.map(jahr => {
+      const imJahr = schluessel.filter(k => k.startsWith(jahr + '-'));
+      const alleJ = imJahr.flatMap(k => gruppen.get(k));
+      const jOffen = suche || !jahreZu.has(jahr);
+      return `<div class="gruppe"><button class="kw-titel jahr" data-g="j:${jahr}">${pfeil(jOffen)}${jahr}<span>${alleJ.filter(b => b.quelle !== 'ersetzt').length} Ber. · ${ABH.zahl(alleJ.reduce((s, b) => s + h(b), 0))} Std.</span></button>
+        <div class="gruppe-inhalt"${jOffen ? '' : ' hidden'}>` + imJahr.map(k => {
+      const g = gruppen.get(k), kw = k.split('-')[1];
       const std = g.reduce((s, b) => s + h(b), 0);
       const offen = suche || offeneGruppen.has('w:' + k);
-      return `<div class="gruppe"><button class="kw-titel" data-g="w:${k}">${pfeil(offen)}KW ${+kw} / ${jahr}<span>${g.filter(b => b.quelle !== 'ersetzt').length} Ber. · ${ABH.zahl(std)} Std.</span></button>
+      return `<div class="gruppe"><button class="kw-titel" data-g="w:${k}">${pfeil(offen)}KW ${+kw}<span>${g.filter(b => b.quelle !== 'ersetzt').length} Ber. · ${ABH.zahl(std)} Std.</span></button>
         <div class="gruppe-inhalt"${offen ? '' : ' hidden'}>` + g.map(b => {
         const datum = b.von ? ABH.datumDE(b.von) + (b.bis && b.bis !== b.von ? ' – ' + ABH.datumDE(b.bis) : '') : '';
         const std = b.quelle === 'teils' ? `${ABH.zahl(b.gez)} <span class="klein-grau">(${ABH.zahl(b.std)})</span>`
@@ -464,6 +471,7 @@
           <div class="z2">${esc(datum)}</div>
           <div class="taet">${esc(b.taet || 'Keine Tätigkeiten eingetragen.')}${b.quelle === 'ersetzt' ? '\n\nDiese Tage sind durch einen Handy-Bericht abgedeckt und zählen nicht mit.' : b.quelle === 'teils' ? '\n\nEinzelne Tage sind durch einen Handy-Bericht abgedeckt und zählen dort.' : ''}</div></button>`;
       }).join('') + '</div></div>';
+    }).join('') + '</div></div>';
     }).join('');
     $('alleListe').querySelectorAll('.eintrag').forEach(e => e.onclick = () => e.classList.toggle('offen'));
     gruppenKlick();
@@ -472,12 +480,19 @@
   // Auf-/Zuklappen der Gruppen (wird gemerkt)
   let ansicht = laden('abh.ansicht', 'woche');
   const offeneGruppen = new Set(laden('abh.offen', []) || []);
+  let jahreZu = laden('abh.jahreZu', null); if (jahreZu) jahreZu = new Set(jahreZu);
   function gruppenKlick() {
     $('alleListe').querySelectorAll('.kw-titel').forEach(t => t.onclick = () => {
       const g = t.dataset.g, inhalt = t.nextElementSibling;
       const offen = inhalt.hidden;
       inhalt.hidden = !offen;
       t.querySelector('.pfeil').textContent = offen ? '▾' : '▸';
+      if (g.startsWith('j:')) {
+        // Jahre: gemerkt wird, welche zu sind
+        if (offen) jahreZu.delete(g.slice(2)); else jahreZu.add(g.slice(2));
+        sichern('abh.jahreZu', [...jahreZu]);
+        return;
+      }
       if (offen) offeneGruppen.add(g); else offeneGruppen.delete(g);
       sichern('abh.offen', [...offeneGruppen]);
     });

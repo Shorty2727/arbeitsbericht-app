@@ -1,5 +1,5 @@
 // Offline-Speicher der App-Dateien (Berichte selbst liegen im Gerätespeicher, nicht hier)
-const CACHE = 'arbeitsbericht-v5';
+const CACHE = 'arbeitsbericht-v6';
 const DATEIEN = ['./', 'index.html', 'style.css', 'app.js', 'pdf.js', 'jspdf.umd.min.js', 'logo.png',
   'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 

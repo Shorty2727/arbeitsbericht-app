@@ -129,3 +129,5 @@ button.kw-titel span { margin-left: auto; font-size: 13px; white-space: nowrap; 
   padding: 10px 14px; font: inherit; color: var(--text); margin-top: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
 .projekt-zeile .z1 { display: flex; } .projekt-zeile .nr { font-weight: 700; color: var(--wein); } .projekt-zeile .std { margin-left: auto; font-weight: 600; }
 .projekt-zeile .z2 { font-size: 14px; color: var(--grau); }
+button.kw-titel.jahr { background: #eae6de; font-size: 17px; }
+.gruppe-inhalt .gruppe-inhalt { padding-left: 10px; }
