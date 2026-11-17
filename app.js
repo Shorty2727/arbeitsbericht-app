@@ -1,7 +1,7 @@
 /* Arbeitsberichte – Handy-App (läuft komplett im Browser, Daten bleiben auf dem Gerät) */
 (function () {
   'use strict';
-  const VERSION = '1.6';
+  const VERSION = '1.7';
   const $ = (id) => document.getElementById(id);
   const K = { berichte: 'abh.berichte', einst: 'abh.einst', projekte: 'abh.projekte' };
 
@@ -38,14 +38,20 @@
 
   // ---------- Navigation ----------
   function seite(name) {
-    for (const s of ['Liste', 'Editor', 'Einst']) $('seite' + s).hidden = s !== name;
+    for (const s of ['Liste', 'Editor', 'Einst', 'Ansicht']) $('seite' + s).hidden = s !== name;
     $('zurueck').hidden = name === 'Liste';
     $('einstKnopf').hidden = name !== 'Liste';
     window.scrollTo(0, 0);
   }
   function zurListe() { aktuell = null; seite('Liste'); $('titel').textContent = 'Arbeitsberichte'; listeZeigen(); }
   $('zurueck').onclick = () => history.back();
-  window.addEventListener('popstate', () => { if ($('sigDialog').hidden) zurListe(); else sigSchliessen(); });
+  let ausAnsicht = null;
+  window.addEventListener('popstate', () => {
+    if (!$('sigDialog').hidden) { sigSchliessen(); return; }
+    const y = !$('seiteAnsicht').hidden ? ausAnsicht : null;
+    zurListe();
+    if (y != null) requestAnimationFrame(() => window.scrollTo(0, y));
+  });
 
   // ---------- Liste ----------
   function listeZeigen() {
@@ -392,6 +398,7 @@
     const alle = projekte.berichte || [];
     const q = $('alleSuche').value.trim().toLowerCase();
     const liste = alle.filter(b => !q || [b.nr, b.kunde, b.projekt, b.taet, 'kw' + b.kw].join(' ').toLowerCase().includes(q));
+    alleAktuell = liste; // für die Ansicht
     $('alleLeer').hidden = alle.length > 0;
     const summe = liste.reduce((s, b) => s + (b.gez ?? b.std ?? 0), 0);
     $('alleSumme').textContent = alle.length && projekte.stand ? `Stand ${new Date(projekte.stand).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' })}` : '';
@@ -465,7 +472,7 @@
         const datum = b.von ? ABH.datumDE(b.von) + (b.bis && b.bis !== b.von ? ' – ' + ABH.datumDE(b.bis) : '') : '';
         const std = b.quelle === 'teils' ? `${ABH.zahl(b.gez)} <span class="klein-grau">(${ABH.zahl(b.std)})</span>`
           : b.quelle === 'ersetzt' ? `<span class="klein-grau">(${ABH.zahl(b.std)})</span>` : ABH.zahl(b.std || 0);
-        return `<button class="eintrag ${b.quelle === 'ersetzt' ? 'grau' : ''}">
+        return `<button class="eintrag ${b.quelle === 'ersetzt' ? 'grau' : ''}" data-i="${liste.indexOf(b)}">
           <div class="z1"><span class="nr">${esc(b.nr || '–')}</span>${QUELLE[b.quelle] || ''}<span class="std">${std} Std.</span></div>
           <div class="z2">${esc([b.kunde, b.projekt].filter(Boolean).join(' – ') || '–')}</div>
           <div class="z2">${esc(datum)}</div>
@@ -473,7 +480,7 @@
       }).join('') + '</div></div>';
     }).join('') + '</div></div>';
     }).join('');
-    $('alleListe').querySelectorAll('.eintrag').forEach(e => e.onclick = () => e.classList.toggle('offen'));
+    $('alleListe').querySelectorAll('.eintrag').forEach(e => e.onclick = () => berichtAnsehen(liste[+e.dataset.i]));
     gruppenKlick();
   }
 
@@ -517,6 +524,44 @@
   $('alleZu').onclick = () => alleKlappen(false);
   $('ansichtWoche').onclick = () => { ansicht = 'woche'; sichern('abh.ansicht', ansicht); alleZeigen(); };
   $('ansichtKunde').onclick = () => { ansicht = 'kunde'; sichern('abh.ansicht', ansicht); alleZeigen(); };
+
+  // ---------- Bericht groß ansehen (wie das PDF, nur als Seite) ----------
+  let alleAktuell = [];
+  function berichtAnsehen(b) {
+    if (!b) return;
+    ausAnsicht = window.scrollY;
+    history.pushState({ s: 'ansicht' }, '');
+    seite('Ansicht');
+    $('titel').textContent = 'Bericht ' + (b.nr || '');
+    const zeiten = (b.zeiten || []).slice().sort((x, y) => (x.datum + x.von).localeCompare(y.datum + y.von));
+    const summe = zeiten.length ? zeiten.reduce((s, z) => s + (z.std || 0), 0) : (b.std || 0);
+    const datum = b.von ? ABH.datumDE(b.von) + (b.bis && b.bis !== b.von ? ' – ' + ABH.datumDE(b.bis) : '') : '';
+    const taet = (b.taet || '').split('\n').map(t => t.trim()).filter(Boolean);
+    const hinweis = b.quelle === 'handy' ? '<div class="blatt-hinweis gruen">✍ Handy-Bericht, vom Kunden unterschrieben</div>'
+      : b.quelle === 'ersetzt' ? '<div class="blatt-hinweis">Diese Tage sind durch einen Handy-Bericht abgedeckt und zählen nicht mit.</div>'
+      : b.quelle === 'teils' ? `<div class="blatt-hinweis">Einzelne Tage sind durch einen Handy-Bericht abgedeckt, gezählt werden ${ABH.zahl(b.gez)} Std.</div>` : '';
+    $('blatt').innerHTML = `
+      ${hinweis}
+      <div class="blatt-kopf"><img src="logo.png" alt="intratec"><div><h1>Arbeitsbericht</h1><span>KW ${b.kw} / ${b.jahr}</span></div></div>
+      <div class="blatt-felder">
+        <div class="breit"><small>Kunde</small><b>${esc(b.kunde || '–')}</b></div>
+        <div><small>Projekt-Nr</small><b>${esc(b.nr || '–')}</b></div>
+        <div><small>Datum</small><b>${esc(datum)}</b></div>
+        <div class="breit"><small>Projekt</small><b>${esc(b.projekt || '–')}</b></div>
+      </div>
+      <h3>Tätigkeiten</h3>
+      ${taet.length ? `<ul class="blatt-taet">${taet.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<p class="klein-grau">Keine Tätigkeiten eingetragen.</p>'}
+      <h3>Arbeitszeit</h3>
+      <table class="blatt-tab"><thead><tr><th>Datum</th><th>von – bis</th><th class="r">Pause</th><th class="r">Std.</th></tr></thead><tbody>
+        ${zeiten.map(z => `<tr><td>${ABH.datumDE(z.datum)}</td><td>${esc(z.von)} – ${esc(z.bis)}</td><td class="r">${z.pause ? ABH.hhmm(Math.round(z.pause * 60)).replace(/^0/, '') : ''}</td><td class="r">${ABH.zahl(z.std || 0)}</td></tr>`).join('')
+          || '<tr><td colspan="4" class="klein-grau">Keine Zeiten</td></tr>'}
+      </tbody><tfoot><tr><td colspan="3">Summe</td><td class="r">${ABH.zahl(summe)}</td></tr></tfoot></table>
+      ${(b.material || []).length ? `<h3>Beigestelltes Material</h3><table class="blatt-tab"><thead><tr><th>Menge</th><th>Einheit</th><th>Bezeichnung</th></tr></thead><tbody>
+        ${b.material.map(m => `<tr><td>${esc(m.menge)}</td><td>${esc(m.einheit)}</td><td>${esc(m.bezeichnung)}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${(b.offene || []).length ? `<h3>Offene Punkte / Nächste Schritte</h3><table class="blatt-tab"><thead><tr><th>Bis</th><th>Name</th><th>Bemerkung</th></tr></thead><tbody>
+        ${b.offene.map(o => `<tr><td>${esc(o.bis)}</td><td>${esc(o.name)}</td><td>${esc(o.bemerkung)}</td></tr>`).join('')}</tbody></table>` : ''}
+      <p class="blatt-datei">${esc(b.datei || '')}</p>`;
+  }
 
   // ---------- Einstellungen ----------
   $('einstKnopf').onclick = () => {
