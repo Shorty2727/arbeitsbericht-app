@@ -1,7 +1,7 @@
 /* Arbeitsberichte – Handy-App (läuft komplett im Browser, Daten bleiben auf dem Gerät) */
 (function () {
   'use strict';
-  const VERSION = '1.2';
+  const VERSION = '1.3';
   const $ = (id) => document.getElementById(id);
   const K = { berichte: 'abh.berichte', einst: 'abh.einst', projekte: 'abh.projekte' };
 
@@ -462,7 +462,7 @@
   const istIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
   $('installHinweis').hidden = !(istIos && !navigator.standalone);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost'))
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
   history.replaceState({ s: 'liste' }, '');
   if (!einst.name) setTimeout(() => toast('Tipp: Unter ⚙ Name, Kürzel und deine Unterschrift hinterlegen'), 600);
   listeZeigen();
