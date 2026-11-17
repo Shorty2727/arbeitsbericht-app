@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arbeitsbericht</title>
+<meta name="theme-color" content="#5B192B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Arbeitsbericht">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="kopf">
+  <button class="kopf-zurueck" id="zurueck" hidden aria-label="Zurück">‹</button>
+  <div class="kopf-titel" id="titel">Arbeitsberichte</div>
+  <button class="kopf-knopf" id="einstKnopf" aria-label="Einstellungen">⚙</button>
+</header>
+
+<main>
+  <!-- ===== Liste ===== -->
+  <section id="seiteListe" class="seite">
+    <div class="reiter" role="tablist">
+      <button id="reiterHandy" class="aktiv" role="tab">Am Handy</button>
+      <button id="reiterAlle" role="tab">Alle Berichte</button>
+    </div>
+    <div id="bereichHandy">
+      <button class="knopf primaer gross" id="neu">＋ Neuer Arbeitsbericht</button>
+      <div id="installHinweis" class="hinweis" hidden>
+        Tipp: Über <b>Teilen › Zum Home-Bildschirm</b> wird daraus eine App, die auch ohne Netz funktioniert.
+      </div>
+      <div id="liste"></div>
+      <p class="leer" id="leer" hidden>Noch keine Berichte. Tippe auf „Neuer Arbeitsbericht“.</p>
+    </div>
+    <div id="bereichAlle" hidden>
+      <input id="alleSuche" type="search" placeholder="Suchen: Projekt-Nr, Kunde, Tätigkeit …" autocomplete="off">
+      <div class="alle-kopf">
+        <span id="alleSumme" class="klein-grau"></span>
+        <button class="knopf klein" id="alleLaden">Vom PC aktualisieren</button>
+      </div>
+      <div id="alleListe"></div>
+      <p class="leer" id="alleLeer" hidden>Noch keine Daten vom PC.<br>Tippe auf „Vom PC aktualisieren“ und wähle in OneDrive › <b>Arbeitsberichte Handy</b> die Datei <b>PC-Daten_fuer_Handy.json</b>.</p>
+    </div>
+  </section>
+
+  <!-- ===== Editor ===== -->
+  <section id="seiteEditor" class="seite" hidden>
+    <div class="gesperrt-hinweis" id="gesperrt" hidden>
+      Dieser Bericht ist unterschrieben und abgeschlossen.
+      <button class="knopf klein" id="entsperren">Bearbeiten</button>
+    </div>
+
+    <div class="karte">
+      <h2>Projekt</h2>
+      <label>Projekt-Nr
+        <input id="nr" inputmode="numeric" autocomplete="off" placeholder="z. B. 20260109">
+      </label>
+      <div id="vorschlaege" class="vorschlaege"></div>
+      <label>Kunde <input id="kunde" autocomplete="off"></label>
+      <label>Projektbezeichnung <input id="projekt" autocomplete="off"></label>
+    </div>
+
+    <div class="karte">
+      <h2>Arbeitszeit <span class="rechts" id="summe"></span></h2>
+      <div id="zeiten"></div>
+      <button class="knopf" id="zeitNeu">＋ Zeit hinzufügen</button>
+      <p class="klein-grau">Von/Bis werden auf 15 Minuten gerundet, über 6 Stunden werden 0:45 Pause abgezogen.</p>
+    </div>
+
+    <div class="karte">
+      <h2>Tätigkeiten</h2>
+      <textarea id="taetigkeiten" rows="6" placeholder="Eine Tätigkeit pro Zeile"></textarea>
+    </div>
+
+    <div class="karte">
+      <h2>Beigestelltes Material</h2>
+      <div id="material"></div>
+      <button class="knopf" id="materialNeu">＋ Material</button>
+    </div>
+
+    <div class="karte">
+      <h2>Offene Punkte / Nächste Schritte</h2>
+      <div id="offene"></div>
+      <button class="knopf" id="offenNeu">＋ Offener Punkt</button>
+    </div>
+
+    <div class="karte">
+      <h2>Unterschriften</h2>
+      <div class="unterschrift-feld" id="sigKundeFeld">
+        <div class="sig-titel">Kunde</div>
+        <img id="sigKundeBild" alt="" hidden>
+        <div class="sig-leer" id="sigKundeLeer">Noch nicht unterschrieben</div>
+      </div>
+      <label>Name Kunde (in Druckschrift) <input id="kundeName" autocomplete="off"></label>
+      <button class="knopf primaer" id="sigKundeKnopf">✍ Kunde unterschreiben lassen</button>
+
+      <div class="unterschrift-feld" id="sigTechFeld">
+        <div class="sig-titel">Fa. Intratec</div>
+        <img id="sigTechBild" alt="" hidden>
+        <div class="sig-leer" id="sigTechLeer">Noch nicht unterschrieben</div>
+      </div>
+      <div class="zeile2">
+        <button class="knopf" id="sigTechKnopf">✍ Selbst unterschreiben</button>
+        <button class="knopf" id="sigTechGespeichert">Gespeicherte verwenden</button>
+      </div>
+    </div>
+
+    <div class="karte aktionen">
+      <button class="knopf primaer gross" id="fertig">✓ Fertig – PDF erstellen</button>
+      <div id="teilenBereich" hidden>
+        <button class="knopf wein gross" id="teilenKunde">PDF dem Kunden geben</button>
+        <p class="klein-grau">Mail, WhatsApp, AirDrop … – je nachdem, was der Kunde möchte.</p>
+        <button class="knopf wein gross" id="teilenPc">An PC übertragen (OneDrive)</button>
+        <p class="klein-grau">Im Teilen-Menü „In Dateien sichern“ › OneDrive › Ordner <b>Arbeitsberichte Handy</b> wählen.
+          Die PC-App übernimmt den Bericht dann automatisch.</p>
+        <button class="knopf" id="ansehen">PDF ansehen</button>
+      </div>
+      <button class="knopf gefahr" id="loeschen">Bericht löschen</button>
+    </div>
+  </section>
+
+  <!-- ===== Einstellungen ===== -->
+  <section id="seiteEinst" class="seite" hidden>
+    <div class="karte">
+      <h2>Ich</h2>
+      <label>Name im Bericht <input id="eName" autocomplete="name"></label>
+      <label>Kürzel <input id="eKuerzel" placeholder="z. B. KurzD"></label>
+      <div class="unterschrift-feld">
+        <div class="sig-titel">Meine Unterschrift</div>
+        <img id="eSigBild" alt="" hidden>
+        <div class="sig-leer" id="eSigLeer">Keine gespeichert</div>
+      </div>
+      <button class="knopf" id="eSigKnopf">✍ Unterschrift speichern</button>
+      <p class="klein-grau">Wird bei „Gespeicherte verwenden“ in den Bericht übernommen.</p>
+    </div>
+    <div class="karte">
+      <h2>Daten vom PC</h2>
+      <p class="klein-grau" id="eProjektInfo"></p>
+      <button class="knopf" id="eProjekteLaden">Daten vom PC laden …</button>
+      <input type="file" id="eProjekteDatei" accept=".json,application/json" hidden>
+      <p class="klein-grau">Die PC-App legt die Datei <b>PC-Daten_fuer_Handy.json</b> in den OneDrive-Ordner
+        <b>Arbeitsberichte Handy</b>. Darin sind deine Projekte (Kunde und Bezeichnung kommen beim Tippen der Projekt-Nr)
+        und die Übersicht aller Berichte vom PC.</p>
+    </div>
+    <div class="karte">
+      <h2>Über</h2>
+      <p class="klein-grau">Alle Berichte bleiben auf diesem Handy, bis du sie teilst. Version <span id="version"></span> · © David Kurz</p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== Unterschrift (Vollbild) ===== -->
+<div id="sigDialog" class="sig-dialog" hidden>
+  <div class="sig-kopf">
+    <span id="sigDialogTitel">Unterschrift</span>
+    <span class="klein-grau hell">Tipp: Handy quer halten</span>
+  </div>
+  <div class="sig-flaeche">
+    <canvas id="sigCanvas"></canvas>
+    <div class="sig-linie"></div>
+    <div class="sig-x">✕</div>
+  </div>
+  <div class="sig-knoepfe">
+    <button class="knopf" id="sigAbbrechen">Abbrechen</button>
+    <button class="knopf" id="sigLoeschen">Löschen</button>
+    <button class="knopf primaer" id="sigOk">Übernehmen</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="jspdf.umd.min.js"></script>
+<script src="pdf.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
