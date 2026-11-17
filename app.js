@@ -1,7 +1,7 @@
 /* Arbeitsberichte – Handy-App (läuft komplett im Browser, Daten bleiben auf dem Gerät) */
 (function () {
   'use strict';
-  const VERSION = '1.1';
+  const VERSION = '1.2';
   const $ = (id) => document.getElementById(id);
   const K = { berichte: 'abh.berichte', einst: 'abh.einst', projekte: 'abh.projekte' };
 
@@ -213,35 +213,70 @@
 
   // Zeichenfläche
   const cv = $('sigCanvas'), ctx = cv.getContext('2d');
-  let sigFertig = null, gezeichnet = false, zeichnet = false, letzter = null;
+  // Striche werden in CSS-Pixeln gemerkt: so passt der Finger immer zur Linie (auch nach dem Drehen),
+  // und beim Drehen wird die Unterschrift passend neu gezeichnet statt gelöscht.
+  let sigFertig = null, gezeichnet = false, zeichnet = false;
+  let striche = [], strich = null, flaeche = { w: 0, h: 0 };
+  function strichZeichnen(s) {
+    const dpr = cv.width / Math.max(1, flaeche.w);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = ctx.fillStyle = '#10204a'; ctx.lineWidth = 2.6 * dpr;
+    if (s.length === 1) { ctx.beginPath(); ctx.arc(s[0].x * dpr, s[0].y * dpr, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fill(); return; }
+    ctx.beginPath(); ctx.moveTo(s[0].x * dpr, s[0].y * dpr);
+    for (let i = 1; i < s.length; i++) {
+      const a = s[i - 1], b = s[i];
+      ctx.quadraticCurveTo(a.x * dpr, a.y * dpr, (a.x + b.x) / 2 * dpr, (a.y + b.y) / 2 * dpr);
+    }
+    const l = s[s.length - 1]; ctx.lineTo(l.x * dpr, l.y * dpr); ctx.stroke();
+  }
   function sigGroesse() {
     const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    if (r.width < 10 || r.height < 10) return;
+    if (Math.abs(r.width - flaeche.w) < 1 && Math.abs(r.height - flaeche.h) < 1 && cv.width === Math.round(r.width * dpr)) return;
+    // vorhandene Striche in die neue Fläche einpassen (Seitenverhältnis bleibt)
+    if (striche.length && flaeche.w) {
+      const f = Math.min(r.width / flaeche.w, r.height / flaeche.h);
+      const dx = (r.width - flaeche.w * f) / 2, dy = (r.height - flaeche.h * f) / 2;
+      striche = striche.map(s => s.map(p => ({ x: p.x * f + dx, y: p.y * f + dy })));
+    }
+    flaeche = { w: r.width, h: r.height };
     cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#10204a'; ctx.lineWidth = 2.6 * dpr;
-    gezeichnet = false;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    striche.forEach(strichZeichnen);
   }
+  function sigLeeren() { striche = []; strich = null; gezeichnet = false; ctx.clearRect(0, 0, cv.width, cv.height); }
   function sigOeffnen(titel, fertig) {
     sigFertig = fertig;
     $('sigDialogTitel').textContent = titel;
     $('sigDialog').hidden = false;
     history.pushState({ s: 'sig' }, '');
+    flaeche = { w: 0, h: 0 }; sigLeeren();
     requestAnimationFrame(sigGroesse);
   }
   function sigSchliessen() { $('sigDialog').hidden = true; sigFertig = null; }
-  window.addEventListener('resize', () => { if (!$('sigDialog').hidden) { if (gezeichnet) toast('Bitte neu unterschreiben (Bildschirm gedreht)'); sigGroesse(); } });
-  function punkt(e) { const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1; return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr }; }
-  cv.addEventListener('pointerdown', (e) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); zeichnet = true; letzter = punkt(e); ctx.beginPath(); ctx.arc(letzter.x, letzter.y, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); gezeichnet = true; });
+  // Größe immer nach dem Layout prüfen (iOS meldet "resize" beim Drehen, bevor die Fläche fertig ist)
+  if (window.ResizeObserver) new ResizeObserver(() => { if (!$('sigDialog').hidden) sigGroesse(); }).observe(cv);
+  const spaeter = () => { if (!$('sigDialog').hidden) [50, 250, 600].forEach(t => setTimeout(sigGroesse, t)); };
+  window.addEventListener('resize', spaeter); window.addEventListener('orientationchange', spaeter);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', spaeter);
+  /** Fingerposition in CSS-Pixeln der Fläche – immer frisch gemessen. */
+  function punkt(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  cv.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); sigGroesse(); cv.setPointerCapture(e.pointerId); zeichnet = true;
+    strich = [punkt(e)]; striche.push(strich); strichZeichnen(strich); gezeichnet = true;
+  });
   cv.addEventListener('pointermove', (e) => {
-    if (!zeichnet) return; e.preventDefault();
+    if (!zeichnet || !strich) return; e.preventDefault();
     const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    const dpr = cv.width / Math.max(1, flaeche.w);
     for (const ev of evs) {
-      const p = punkt(ev);
-      const mx = (letzter.x + p.x) / 2, my = (letzter.y + p.y) / 2;
-      ctx.beginPath(); ctx.moveTo(letzter.x, letzter.y); ctx.quadraticCurveTo(letzter.x, letzter.y, mx, my); ctx.lineTo(p.x, p.y); ctx.stroke();
-      letzter = p;
+      const p = punkt(ev), a = strich[strich.length - 1];
+      const v = strich.length > 1 ? strich[strich.length - 2] : a;
+      strich.push(p);
+      ctx.beginPath(); ctx.moveTo((v.x + a.x) / 2 * dpr, (v.y + a.y) / 2 * dpr);
+      ctx.quadraticCurveTo(a.x * dpr, a.y * dpr, (a.x + p.x) / 2 * dpr, (a.y + p.y) / 2 * dpr); ctx.stroke();
     }
   });
-  const ende = () => { zeichnet = false; };
+  const ende = () => { zeichnet = false; strich = null; };
   cv.addEventListener('pointerup', ende); cv.addEventListener('pointercancel', ende); cv.addEventListener('pointerleave', ende);
 
   function sigExport() {
@@ -259,7 +294,7 @@
     out.getContext('2d').drawImage(cv, x0, y0, bw, bh, 0, 0, out.width, out.height);
     return out.toDataURL('image/png');
   }
-  $('sigLoeschen').onclick = () => { ctx.clearRect(0, 0, cv.width, cv.height); gezeichnet = false; };
+  $('sigLoeschen').onclick = () => sigLeeren();
   $('sigAbbrechen').onclick = () => history.back();
   $('sigOk').onclick = () => {
     if (!gezeichnet) { toast('Bitte zuerst unterschreiben'); return; }
