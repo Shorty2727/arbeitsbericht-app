@@ -1,7 +1,7 @@
 /* Arbeitsberichte – Handy-App (läuft komplett im Browser, Daten bleiben auf dem Gerät) */
 (function () {
   'use strict';
-  const VERSION = '1.5';
+  const VERSION = '1.6';
   const $ = (id) => document.getElementById(id);
   const K = { berichte: 'abh.berichte', einst: 'abh.einst', projekte: 'abh.projekte' };
 
@@ -497,6 +497,24 @@
       sichern('abh.offen', [...offeneGruppen]);
     });
   }
+  // Alle auf / Alle zu: in der Wochenansicht bleiben beim Zuklappen die Jahre offen (wie am PC)
+  function alleKlappen(auf) {
+    const titel = [...$('alleListe').querySelectorAll('.kw-titel')].map(t => t.dataset.g);
+    for (const g of titel) {
+      if (g.startsWith('j:')) { if (auf) jahreZu?.delete(g.slice(2)); }
+      else if (auf) offeneGruppen.add(g); else offeneGruppen.delete(g);
+    }
+    if (auf) {
+      // auch Wochen in zugeklappten Jahren öffnen
+      for (const b of projekte.berichte || []) offeneGruppen.add(`w:${b.jahr}-${String(b.kw).padStart(2, '0')}`);
+      jahreZu = new Set();
+    }
+    sichern('abh.offen', [...offeneGruppen]);
+    if (jahreZu) sichern('abh.jahreZu', [...jahreZu]);
+    alleZeigen();
+  }
+  $('alleAuf').onclick = () => alleKlappen(true);
+  $('alleZu').onclick = () => alleKlappen(false);
   $('ansichtWoche').onclick = () => { ansicht = 'woche'; sichern('abh.ansicht', ansicht); alleZeigen(); };
   $('ansichtKunde').onclick = () => { ansicht = 'kunde'; sichern('abh.ansicht', ansicht); alleZeigen(); };
 

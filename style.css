@@ -131,3 +131,5 @@ button.kw-titel span { margin-left: auto; font-size: 13px; white-space: nowrap; 
 .projekt-zeile .z2 { font-size: 14px; color: var(--grau); }
 button.kw-titel.jahr { background: #eae6de; font-size: 17px; }
 .gruppe-inhalt .gruppe-inhalt { padding-left: 10px; }
+.klapp-knoepfe { display: flex; gap: 8px; justify-content: flex-end; }
+.klapp-knoepfe .knopf.klein { margin: 0; }
